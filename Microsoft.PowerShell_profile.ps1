@@ -45,12 +45,15 @@ function Get-Subversion-Info {
     $hash[$name] = $value
   }
 
-  $url = $hash.URL
+  $url = $hash["URL"]
   $branch = "trunk"
   if ($url.IndexOf("branches") -gt -1) {
-    $posStart = $url.IndexOf("branches")
-    $posEnd = $url.IndexOf("/", $posStart)
-    $branch = $url.SubString($posStart, $posEnd - $posStart)
+    $p1 = $url.IndexOf("branches")
+    $p2 = $url.IndexOf("/", $p1 + 9)
+    if ($p2 -eq -1) {
+      $p2 = $url.length
+    }
+    $branch = $url.SubString($p1, $p2 - $p1)
   }
   $hash["Branch"] = $branch
 
