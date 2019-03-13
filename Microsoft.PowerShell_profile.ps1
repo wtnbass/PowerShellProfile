@@ -1,20 +1,78 @@
 # Prompt
 function global:prompt() {
-  $p = $pwd.path.split("\\")
-  $now = $p[$p.length - 1]
-  if ($pwd.path -eq $home) {
-    $now = "~"
+  $status = $?
+
+  Write-Host $pwd.path -NoNewline -ForegroundColor Yellow
+
+  $svninfo = Get-Subversion-Info
+  if ($svninfo -ne $null) {
+    $branch = $svninfo.Branch
+    $rev = $svninfo.Revision
+    Write-Host " (${branch} rev:${rev})" -NoNewline -ForegroundColor Magenta
   }
-  if ($now -eq "") {
-    $now = $p[0]
+
+  # Newline
+  Write-Host ""
+
+  if (!$status) {
+    Write-Host "X "  -NoNewline -ForegroundColor Red
   }
-  write-host $now -NoNewline -ForeGroundColor "Yellow"
-  return " > "
+  Write-Host (Get-Date).ToShortTimeString() -NoNewline
+  return "> "
+}
+
+# Subversionの情報
+function Get-Subversion-Info {
+  $info = svn info 2> $null
+  if ($info -eq $null) {
+    return $null
+  }
+
+  $hash = @{}
+
+  foreach($line in $info) {
+    $pos = $line.IndexOf(":")
+    if ($pos -lt 0) {
+      continue;
+    }
+    $name = $line.SubString(0, $pos).replace(" ", "").trim()
+    $value = $line.SubString($pos + 1).trim()
+
+    if ($name -eq "LastChangedDate") {
+      $pos = $value.IndexOf("(")
+      $value = Get-Date($value.SubString(0, $pos))
+    }
+    $hash[$name] = $value
+  }
+
+  $url = $hash.URL
+  $branch = "trunk"
+  if ($url.IndexOf("branches") -gt -1) {
+    $posStart = $url.IndexOf("branches")
+    $posEnd = $url.IndexOf("/", $posStart)
+    $branch = $url.SubString($posStart, $posEnd - $posStart)
+  }
+  $hash["Branch"] = $branch
+
+  return New-Object -TypeName PSObject -Property $hash
+}
+
+# HTTPサーバーを起動する。
+$HttpServer = Resolve-Path $PROFILE/../HttpServer.ps1
+function Start-Server {
+  start powershell -ArgumentList $HttpServer
+}
+
+# DuckDuckGoで検索する。
+function Search-With-DuckDuckGo {
+  $query = $args -Join "+"
+  start https://duckduckgo.com/?q=$query
 }
 
 # Aliases
 set-alias open start
 set-alias ll ls
+set-alias ddg Search-With-DuckDuckGo
 
 function touch($file) {
   ni -type file -path $file
@@ -37,17 +95,3 @@ function e($path) {
 
 # Powershell起動時にEmacsDaemonを立ち上げる
 estart
-
-# フォルダかどうか判定する
-function Test-Dir {
-  param(
-      $path
-  )
-  return (Test-Path -PathType Container $path)
-}
-
-# HTTPサーバーを起動する。
-$HttpServer = Resolve-Path $PROFILE/../HttpServer.ps1
-function Start-Server {
-  start powershell -ArgumentList $HttpServer
-}
